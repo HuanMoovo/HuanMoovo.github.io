@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HuanMoovo · 独立游戏开发者</title>
+<meta name="description" content="HuanMoovo - 独立游戏开发者。用 Godot 与像素艺术，在废墟上种出新的生命。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* ============ 字体 ============ */
+@font-face {
+  font-family: 'Zpix';
+  src: url('fonts/Zpix.ttf') format('truetype');
+  font-display: swap;
+}
+/* ============ 设计令牌（8px 栅格） ============ */
+:root {
+  --bg:        #0a0e14;
+  --bg-2:      #0d131c;
+  --panel:     #121a26;
+  --panel-2:   #172130;
+  --green:     #3ddc97;   /* 黏菌绿 - 主色 */
+  --green-dim: #2ba873;
+  --green-glow:rgba(61,220,151,.35);
+  --gold:      #c9a04b;   /* 弹壳金 - 次色 */
+  --purple:    #a78bfa;   /* 深渊紫 - 强调 */
+  --text:      #e6edf3;
+  --muted:     #7d8b99;
+  --border:    #2a3442;
+  --border-hi: #3d4c5f;
+  --shadow:    rgba(0,0,0,.55);
+  --px: 8px;
+  --max-w: 1000px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Zpix', 'Microsoft YaHei', 'PingFang SC', monospace;
+  font-size: 12px;
+  line-height: 2;
+  letter-spacing: .5px;
+  color: var(--text);
+  background: var(--bg);
+  overflow-x: hidden;
+  -webkit-font-smoothing: none;
+}
+::selection { background: var(--green); color: var(--bg); }
+
+/* 像素扫描线氛围（极淡） */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background: repeating-linear-gradient(0deg,
+    transparent 0px, transparent 3px,
+    rgba(255,255,255,.012) 3px, rgba(255,255,255,.012) 4px);
+}
+
+/* ============ 像素星点背景 ============ */
+.stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.star {
+  position: absolute; width: 3px; height: 3px; background: var(--green);
+  opacity: .25; animation: float linear infinite;
+}
+.star.gold  { background: var(--gold); }
+.star.purple{ background: var(--purple); }
+@keyframes float {
+  0%   { transform: translateY(0); opacity: 0; }
+  10%  { opacity: .3; }
+  90%  { opacity: .3; }
+  100% { transform: translateY(-100vh); opacity: 0; }
+}
+
+/* ============ 像素通用 ============ */
+.px-box {
+  background: var(--panel);
+  border: 3px solid var(--border);
+  box-shadow:
+    0 0 0 3px var(--bg),
+    6px 6px 0 var(--shadow);
+  position: relative;
+}
+.px-btn {
+  display: inline-block; font-family: inherit; font-size: 12px;
+  padding: 12px 24px; color: var(--bg); background: var(--green);
+  border: 0; cursor: pointer; text-decoration: none; letter-spacing: 1px;
+  box-shadow: 0 4px 0 var(--green-dim), 4px 4px 0 var(--shadow);
+  transition: transform .06s steps(2), box-shadow .06s steps(2);
+  user-select: none;
+}
+.px-btn:hover { transform: translate(-2px,-2px); box-shadow: 0 6px 0 var(--green-dim), 6px 6px 0 var(--shadow); }
+.px-btn:active { transform: translate(2px,2px); box-shadow: 0 2px 0 var(--green-dim), 2px 2px 0 var(--shadow); }
+.px-btn.ghost {
+  background: transparent; color: var(--green);
+  box-shadow: inset 0 0 0 3px var(--green-dim), 4px 4px 0 var(--shadow);
+}
+.px-btn.ghost:hover { background: rgba(61,220,151,.08); }
+
+/* 章节标题（en 小字 + 中文大字） */
+.section-head { margin-bottom: 40px; }
+.section-head .en {
+  font-family: 'Press Start 2P', 'Zpix', monospace;
+  font-size: 10px; color: var(--green-dim); letter-spacing: 3px;
+  display: block; margin-bottom: 12px;
+}
+.section-head .en::before { content: '■ '; color: var(--green); }
+.section-head h2 { font-size: 24px; font-weight: normal; letter-spacing: 2px; }
+.section-head h2::after {
+  content: ''; display: block; width: 48px; height: 4px;
+  background: var(--green); margin-top: 12px;
+  box-shadow: 56px 0 0 -1px var(--green-dim), 4px 0 0 var(--gold);
+}
+@supports not (font-variation-settings: normal) {}
+.en-font { font-family: 'Press Start 2P', 'Zpix', monospace; }
+
+/* ============ 导航 ============ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(10,14,20,.92);
+  backdrop-filter: blur(4px);
+  border-bottom: 3px solid var(--border);
+}
+.nav-inner {
+  max-width: var(--max-w); margin: 0 auto; padding: 0 24px;
+  height: 64px; display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
+.nav-logo svg { display: block; }
+.nav-logo .name { font-size: 14px; letter-spacing: 2px; }
+.nav-links { display: flex; gap: 8px; }
+.nav-links a {
+  color: var(--muted); text-decoration: none; font-size: 12px;
+  padding: 8px 12px; border: 3px solid transparent; letter-spacing: 1px;
+  transition: all .12s;
+}
+.nav-links a:hover { color: var(--green); border-color: var(--border); background: var(--bg-2); }
+
+/* ============ Hero ============ */
+.hero {
+  max-width: var(--max-w); margin: 0 auto; padding: 160px 24px 96px;
+  display: grid; grid-template-columns: 280px 1fr; gap: 64px; align-items: center;
+  position: relative; z-index: 1;
+}
+.hero-avatar { position: relative; display: flex; justify-content: center; }
+.avatar-frame {
+  padding: 24px; background: var(--bg-2);
+  border: 3px solid var(--border);
+  box-shadow: 0 0 0 3px var(--bg), 8px 8px 0 var(--shadow), 0 0 64px var(--green-glow);
+  animation: bob 3.2s ease-in-out infinite;
+}
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.avatar-frame svg { display: block; image-rendering: pixelated; }
+.hero-text .hi {
+  font-family: 'Press Start 2P', 'Zpix', monospace;
+  font-size: 10px; color: var(--gold); letter-spacing: 2px; display: block; margin-bottom: 16px;
+}
+.hero-text h1 {
+  font-size: 48px; font-weight: normal; line-height: 1.25; letter-spacing: 4px;
+  text-shadow: 4px 4px 0 var(--shadow), 0 0 32px var(--green-glow);
+  margin-bottom: 16px;
+}
+.hero-text .title {
+  font-size: 16px; color: var(--green); letter-spacing: 3px; margin-bottom: 24px;
+}
+.hero-text .title::before { content: '▸ '; color: var(--gold); }
+.hero-text .tagline {
+  color: var(--muted); max-width: 440px; margin-bottom: 40px; border-left: 4px solid var(--border-hi); padding-left: 16px;
+}
+.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+
+/* ============ 通用 section ============ */
+main { position: relative; z-index: 1; }
+section.wrap { max-width: var(--max-w); margin: 0 auto; padding: 96px 24px; }
+section.wrap + section.wrap { border-top: 3px solid var(--bg-2); }
+
+/* ============ About ============ */
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.about-card { padding: 32px; }
+.about-card p { margin-bottom: 16px; color: var(--text); }
+.about-card p:last-child { margin-bottom: 0; }
+.about-card .accent { color: var(--green); }
+.about-card .gold { color: var(--gold); }
+.about-list { list-style: none; }
+.about-list li { padding: 8px 0 8px 28px; position: relative; color: var(--muted); }
+.about-list li::before {
+  content: ''; position: absolute; left: 0; top: 16px; width: 8px; height: 8px;
+  background: var(--green); box-shadow: 2px 2px 0 var(--green-dim);
+}
+.about-list li strong { color: var(--text); font-weight: normal; }
+
+/* ============ Skills ============ */
+.skills-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; }
+.skill { padding: 4px 0; }
+.skill-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.skill-head .lvl { color: var(--gold); font-size: 11px; }
+.skill-bar {
+  height: 16px; background: var(--bg-2); border: 3px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.skill-fill {
+  height: 100%; width: 0; background: var(--green);
+  background-image: repeating-linear-gradient(90deg,
+    var(--green) 0 10px, var(--green-dim) 10px 12px);
+  transition: width 1s steps(12);
+  box-shadow: 0 0 12px var(--green-glow);
+}
+
+/* ============ Projects ============ */
+.projects-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.project { display: flex; flex-direction: column; transition: transform .1s steps(2); }
+.project:hover { transform: translate(-3px,-3px); }
+.project-title-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--panel-2);
+  border-bottom: 3px solid var(--border);
+}
+.project-title-bar .dot { width: 8px; height: 8px; background: var(--green); }
+.project-title-bar .dot:nth-child(2) { background: var(--gold); }
+.project-title-bar .dot:nth-child(3) { background: var(--purple); }
+.project-title-bar .pname { margin-left: auto; color: var(--muted); font-size: 11px; }
+.project-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.project-body h3 { font-size: 16px; font-weight: normal; color: var(--green); letter-spacing: 1px; }
+.project-body .pdesc { color: var(--muted); flex: 1; }
+.project-body .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-size: 10px; padding: 3px 8px; border: 2px solid var(--border-hi);
+  color: var(--muted); letter-spacing: 1px;
+}
+.tag.main { border-color: var(--green-dim); color: var(--green); }
+.tag.wip { border-color: var(--gold); color: var(--gold); }
+.project-body .plink { color: var(--gold); text-decoration: none; font-size: 11px; }
+.project-body .plink:hover { color: var(--green); }
+
+/* ============ Contact ============ */
+.contact-box { text-align: center; padding: 64px 32px; }
+.contact-box h2 { font-size: 24px; font-weight: normal; margin-bottom: 16px; letter-spacing: 2px; }
+.contact-box p { color: var(--muted); margin-bottom: 40px; }
+.contact-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+/* ============ Footer ============ */
+footer {
+  border-top: 3px solid var(--border); position: relative; z-index: 1;
+  padding: 40px 24px; text-align: center; color: var(--muted); font-size: 11px;
+}
+footer .pix-line { display: inline-block; margin: 0 8px; color: var(--green); }
+
+/* ============ 滚动显现 ============ */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .5s steps(6), transform .5s steps(6); }
+.reveal.on { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .skill-fill { transition: none; }
+  .avatar-frame { animation: none; }
+  .star { animation: none; opacity: .15; }
+}
+
+/* ============ 响应式 ============ */
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 128px; text-align: center; }
+  .hero-avatar { order: -1; }
+  .hero-text .tagline { margin-left: auto; margin-right: auto; text-align: left; }
+  .hero-actions { justify-content: center; }
+  .about-grid, .skills-grid { grid-template-columns: 1fr; }
+  .projects-grid { grid-template-columns: 1fr; }
+  .nav-links a { padding: 8px; font-size: 11px; }
+  .nav-links a:nth-child(n+4) { display: none; }
+  .hero-text h1 { font-size: 32px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 像素星点背景 -->
+<div class="stars" id="stars"></div>
+
+<!-- 导航 -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="#top">
+      <svg width="32" height="32" viewBox="0 0 16 16" id="logo-slime"></svg>
+      <span class="name">HuanMoovo</span>
+    </a>
+    <div class="nav-links">
+      <a href="#about">关于</a>
+      <a href="#contact">联系</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="hero" id="top">
+  <div class="hero-avatar reveal">
+    <div class="avatar-frame">
+      <svg width="224" height="224" viewBox="0 0 16 16" id="avatar-slime" shape-rendering="crispEdges"></svg>
+    </div>
+  </div>
+  <div class="hero-text reveal">
+    <span class="hi">// INDIE GAME DEV</span>
+    <h1>HuanMoovo</h1>
+    <div class="title">独立游戏开发者</div>
+    <p class="tagline">
+      用像素与代码，在废墟上种出新的生命。
+    </p>
+    <div class="hero-actions">
+      <a class="px-btn" href="#contact">▶ 联系我</a>
+      <a class="px-btn ghost" href="https://github.com/HuanMoovo" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 关于 -->
+  <section class="wrap" id="about">
+    <div class="about-card px-box reveal" style="max-width:680px;margin:0 auto;">
+      <p>独立游戏开发者，专注 <span class="accent">Godot</span> 与 <span class="gold">像素艺术</span>。</p>
+    </div>
+  </section>
+
+  <!-- 联系 -->
+  <section class="wrap" id="contact">
+    <div class="contact-box px-box reveal">
+      <h2>一起做点好玩的</h2>
+      <p>合作、交流或只是想聊聊独立游戏 —— 欢迎来找我。</p>
+      <div class="contact-actions">
+        <a class="px-btn" href="https://github.com/HuanMoovo" target="_blank" rel="noopener">▶ GitHub @HuanMoovo</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>© 2026 HuanMoovo</span>
+  <span class="pix-line">◆</span>
+  <span>Made with pixels &amp; code</span>
+</footer>
+
+<script>
+/* ============ 像素黏菌精灵（16×16） ============ */
+// 色板：. 透明 | G 深绿边 | g 主绿 | h 高光 | E 眼 | W 眼高光 | M 嘴 | P 腮红
+const PALETTE = {
+  'G': '#2ba873', 'g': '#3ddc97', 'h': '#7cf5c0',
+  'E': '#0a0e14', 'W': '#ffffff', 'M': '#1a5c3a', 'P': '#ff9fb2'
+};
+const SLIME = [
+  "................",
+  "......GGGG......",
+  "....GGggggGG....",
+  "...GgggghgggG...",
+  "..GggggggggggG..",
+  "..GggggggggggG..",
+  ".GggEEggggEEggG.",
+  ".GggEWggggEWggG.",
+  ".GggggggggggggG.",
+  ".GgggMggggMgggG.",
+  ".GgggggMMggggG..",
+  ".GgPggggggggPgG.",
+  ".GggggggggggggG.",
+  "..GggggggggggG..",
+  "...GGggggggGG...",
+  ".....GGGGGG....."
+];
+function renderSlime(targetId, px) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  let svg = '';
+  SLIME.forEach((row, y) => {
+    row.split('').forEach((ch, x) => {
+      if (ch === '.') return;
+      const c = PALETTE[ch];
+      if (!c) return;
+      svg += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+    });
+  });
+  el.innerHTML = svg;
+}
+renderSlime('avatar-slime', 14);
+renderSlime('logo-slime', 2);
+
+/* ============ 像素星点 ============ */
+(function makeStars() {
+  const box = document.getElementById('stars');
+  const colors = ['', ' gold', ' purple'];
+  for (let i = 0; i < 42; i++) {
+    const s = document.createElement('div');
+    s.className = 'star' + colors[Math.floor(Math.random() * colors.length)];
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = (100 + Math.random() * 20) + '%';
+    s.style.animationDuration = (9 + Math.random() * 14) + 's';
+    s.style.animationDelay = (-Math.random() * 20) + 's';
+    const sz = Math.random() < .3 ? 4 : 3;
+    s.style.width = s.style.height = sz + 'px';
+    box.appendChild(s);
+  }
+})();
+
+/* ============ 滚动显现 + 技能条动画 ============ */
+// static=1 用于无滚动环境（截图/打印）静态渲染；reduced-motion 无障碍直接显示
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  || location.search.includes('static=1');
+function fillSkills(root) {
+  root.querySelectorAll('.skill-fill').forEach(f => { f.style.width = f.dataset.w + '%'; });
+}
+if (reduceMotion) {
+  // 无障碍 / 静态渲染环境：直接全部显示
+  document.querySelectorAll('.reveal').forEach(el => {
+    el.classList.add('on');
+    fillSkills(el.closest('.skills-grid') || document);
+  });
+} else {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('on');
+      fillSkills(e.target);
+      io.unobserve(e.target);
+    });
+  }, { threshold: .18 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+}
+</script>
+</body>
+</html>
